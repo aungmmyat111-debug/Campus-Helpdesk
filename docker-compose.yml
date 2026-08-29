@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: helpdesk_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 46587912
+      MYSQL_DATABASE: helpdesk_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - helpdesk_network
+
+  backend:
+    build: .
+    container_name: helpdesk_backend
+    restart: always
+    ports:
+      - "5001:5001"
+    environment:
+      PORT: 5001
+      DATABASE_URL: "mysql://root:46587912@db:3306/helpdesk_db"
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - helpdesk_network
+
+volumes:
+  mysql_data:
+
+networks:
+  helpdesk_network:
+    driver: bridge
