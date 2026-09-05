@@ -12,6 +12,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@azure/identity": "^4.13.2",
+    "@azure/keyvault-secrets": "^4.11.2",
+    "@azure/msal-node": "^6.0.0",
     "@google/genai": "^2.16.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/adapter-mariadb": "^7.9.1",
