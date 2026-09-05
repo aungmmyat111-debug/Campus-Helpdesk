@@ -8,7 +8,6 @@ import './index.css';
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
-// Initialize MSAL before rendering the app
 msalInstance.initialize().then(() => {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
