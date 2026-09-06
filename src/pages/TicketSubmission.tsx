@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Send, AlertTriangle, Sparkles } from 'lucide-react';
 import axios from 'axios';
 import { Navbar } from '../components/Navbar';
 import apiClient from '../api/client';
@@ -8,7 +8,6 @@ import apiClient from '../api/client';
 export const TicketSubmission: React.FC = () => {
   const [title, setTitle] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
-  const [category, setCategory] = useState('GENERAL');
   const [description, setDescription] = useState('');
   const [hasActiveEvent, setHasActiveEvent] = useState(false);
   const [eventName, setEventName] = useState('');
@@ -58,10 +57,10 @@ export const TicketSubmission: React.FC = () => {
     const computedPriority = hasActiveEvent ? 'URGENT' : 'LOW';
 
     try {
+      // Category parameter omitted — handled entirely by backend AI
       await apiClient.post('/tickets', {
         title: title.trim(),
         roomNumber: roomNumber.trim(),
-        category,
         priority: computedPriority,
         description: description.trim(),
       });
@@ -84,7 +83,7 @@ export const TicketSubmission: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/my-tickets')}
-            className="flex items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-medium text-sm transition"
+            className="flex items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-medium text-sm transition cursor-pointer"
           >
             <ArrowLeft size={16} />
             <span>My Tickets</span>
@@ -125,36 +124,18 @@ export const TicketSubmission: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Room Number *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={roomNumber}
-                  onChange={(e) => setRoomNumber(e.target.value)}
-                  placeholder="e.g., 402"
-                  className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Category
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full text-sm border border-slate-300 rounded-lg p-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="GENERAL">GENERAL</option>
-                  <option value="HARDWARE">HARDWARE</option>
-                  <option value="SOFTWARE">SOFTWARE</option>
-                  <option value="NETWORK">NETWORK</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Room Number *
+              </label>
+              <input
+                type="text"
+                required
+                value={roomNumber}
+                onChange={(e) => setRoomNumber(e.target.value)}
+                placeholder="e.g., 402"
+                className="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
 
             <div>
@@ -171,14 +152,20 @@ export const TicketSubmission: React.FC = () => {
               />
             </div>
 
+            {/* AI Notice Badge */}
+            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center space-x-2 text-indigo-700 text-xs">
+              <Sparkles size={16} className="shrink-0 text-indigo-500" />
+              <span>Category will be automatically analyzed and assigned by AI upon submission.</span>
+            </div>
+
             <div className="flex justify-end pt-2">
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-5 py-2.5 rounded-lg flex items-center space-x-2 transition"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-5 py-2.5 rounded-lg flex items-center space-x-2 transition cursor-pointer disabled:opacity-50"
               >
                 <Send size={16} />
-                <span>{loading ? 'Submitting...' : 'Submit Ticket'}</span>
+                <span>{loading ? 'Submitting & Categorizing...' : 'Submit Ticket'}</span>
               </button>
             </div>
           </form>

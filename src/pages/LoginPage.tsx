@@ -11,6 +11,20 @@ export const LoginPage: React.FC = () => {
   const isSyncing = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Classify user roles according to Assumption University Thailand email conventions
+  const classifyAuRoleFromEmail = (email: string): 'STUDENT' | 'TECHNICIAN' | 'ADMINISTRATOR' => {
+    const lowerEmail = email.toLowerCase();
+
+    if (lowerEmail.includes('admin') || lowerEmail.endsWith('@admin.au.edu')) {
+      return 'ADMINISTRATOR';
+    }
+    if (lowerEmail.includes('tech') || lowerEmail.includes('helpdesk') || lowerEmail.endsWith('@staff.au.edu')) {
+      return 'TECHNICIAN';
+    }
+    // Default role for Assumption University student accounts (@g.au.edu / @au.edu)
+    return 'STUDENT';
+  };
+
   useEffect(() => {
     const syncUserWithBackend = async () => {
       if (isAuthenticated && accounts.length > 0 && !isSyncing.current) {
@@ -24,7 +38,32 @@ export const LoginPage: React.FC = () => {
             (activeAccount.idTokenClaims as any)?.email || 
             (activeAccount.idTokenClaims as any)?.preferred_username;
 
-          // Extract Azure AD Object ID (oid or sub)
+          if (!userEmail) {
+            setErrorMessage('Unable to retrieve user email from authentication token.');
+            isSyncing.current = false;
+            return;
+          }
+
+          // Hard Domain Validation: Strictly allow Assumption University domains only
+          const lowerEmail = userEmail.toLowerCase();
+          const isAuDomain = 
+            lowerEmail.endsWith('@au.edu') || 
+            lowerEmail.endsWith('@g.au.edu') || 
+            lowerEmail.endsWith('@ms.au.edu');
+
+          if (!isAuDomain) {
+            setErrorMessage('Access Denied: Please sign in with your official Assumption University account (@au.edu / @g.au.edu).');
+            // Clear invalid MSAL active account state locally
+            instance.setActiveAccount(null);
+            localStorage.clear();
+            sessionStorage.clear();
+            isSyncing.current = false;
+            return;
+          }
+
+          // Assign role based on Assumption University domain patterns
+          const computedRole = classifyAuRoleFromEmail(userEmail);
+
           const adObjectId = 
             (activeAccount.idTokenClaims as any)?.oid || 
             (activeAccount.idTokenClaims as any)?.sub || 
@@ -36,11 +75,11 @@ export const LoginPage: React.FC = () => {
             account: activeAccount,
           });
 
-          // Posts to: http://localhost:5001/api/auth/login
           const response = await apiClient.post('/auth/login', { 
             email: userEmail,
-            name: activeAccount.name || userEmail?.split('@')[0] || 'User',
-            adObjectId, // Added required Prisma field
+            name: activeAccount.name || userEmail.split('@')[0] || 'User',
+            role: computedRole,
+            adObjectId,
             idToken: tokenResponse.idToken,
             token: tokenResponse.idToken || tokenResponse.accessToken,
             accessToken: tokenResponse.accessToken,
@@ -53,20 +92,19 @@ export const LoginPage: React.FC = () => {
             tokenResponse.idToken;
 
           if (!jwtToken) {
-            console.error('No valid token received from backend API:', response.data);
             setErrorMessage('Failed to receive authentication token from server.');
             isSyncing.current = false;
             return;
           }
 
-          const userRole = response.data.user?.role || 'STUDENT';
+          const userRole = response.data.user?.role || computedRole;
           const userName = response.data.user?.name || activeAccount.name || 'User';
 
           localStorage.setItem('app_jwt', jwtToken);
           localStorage.setItem('user_role', userRole);
           localStorage.setItem('user_name', userName);
 
-          // Route navigation based on RBAC
+          // Route navigation based on assigned role
           if (['ADMINISTRATOR', 'ADMIN', 'Administrator'].includes(userRole)) {
             navigate('/admin');
           } else if (['TECHNICIAN', 'Technician'].includes(userRole)) {
@@ -74,9 +112,9 @@ export const LoginPage: React.FC = () => {
           } else {
             navigate('/submit');
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('Failed to exchange token with backend:', err);
-          setErrorMessage('Unable to log in. Please check backend connections.');
+          setErrorMessage(err.response?.data?.error || 'Unable to log in. Please check backend connections.');
           isSyncing.current = false;
         }
       }
@@ -92,6 +130,7 @@ export const LoginPage: React.FC = () => {
     instance.loginRedirect({
       ...loginRequest,
       prompt: 'select_account',
+      extraQueryParameters: { domain_hint: 'organizations' },
     }).catch((err) => {
       console.error('Redirect authentication failed:', err);
       setErrorMessage('Failed to initiate login redirect.');
@@ -107,7 +146,7 @@ export const LoginPage: React.FC = () => {
         </p>
 
         {errorMessage && (
-          <div className="mb-4 p-3 text-xs text-red-700 bg-red-100 rounded-lg text-left">
+          <div className="mb-4 p-3 text-xs text-red-700 bg-red-100 rounded-lg text-left border border-red-200">
             {errorMessage}
           </div>
         )}
@@ -117,7 +156,7 @@ export const LoginPage: React.FC = () => {
           onClick={handleLogin}
           className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-lg shadow transition flex items-center justify-center cursor-pointer"
         >
-          <span>Sign in with Microsoft AD</span>
+          <span>Sign in with Organizational AD</span>
         </button>
       </div>
     </div>
