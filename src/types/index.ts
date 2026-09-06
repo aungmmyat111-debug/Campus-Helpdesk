@@ -1,6 +1,16 @@
-export type UserRole = 'Student' | 'Faculty' | 'Technician' | 'Administrator';
-export type TicketStatus = 'Open' | 'In Progress' | 'Resolved';
-export type TicketPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
+export type UserRole = 
+  | 'STUDENT' 
+  | 'FACULTY' 
+  | 'TECHNICIAN' 
+  | 'ADMINISTRATOR' 
+  | 'ADMIN' 
+  | 'Student' 
+  | 'Faculty' 
+  | 'Technician' 
+  | 'Administrator';
+
+export type TicketStatus = 'Open' | 'In Progress' | 'Resolved' | 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+export type TicketPriority = 'Low' | 'Medium' | 'High' | 'Urgent' | 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
 export interface User {
   id: string;

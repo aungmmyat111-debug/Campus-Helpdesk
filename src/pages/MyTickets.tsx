@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Trash2, X, Send, MessageSquare, MapPin, Tag, Clock } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import apiClient from '../api/client';
-import type { Ticket } from '../types';
+import type { Ticket, Comment } from '../types';
 
 // Inline Ticket Detail Modal Component
 const InlineTicketModal: React.FC<{
@@ -12,23 +12,40 @@ const InlineTicketModal: React.FC<{
 }> = ({ ticket, onClose }) => {
   if (!ticket) return null;
 
-  const [comments, setComments] = useState<Array<{ id: string; author: string; text: string; timestamp: string }>>([]);
+  const [comments, setComments] = useState<Comment[]>(ticket.comments || []);
   const [newComment, setNewComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleAddComment = (e: React.FormEvent) => {
+  useEffect(() => {
+    setComments(ticket.comments || []);
+  }, [ticket]);
+
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
-    setComments((prev) => [
-      ...prev,
-      {
-        id: 'c-' + Date.now(),
-        author: localStorage.getItem('user_name') || 'User',
-        text: newComment.trim(),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
-    setNewComment('');
+    setSubmitting(true);
+    try {
+      const response = await apiClient.post(`/tickets/${ticket.id}/comments`, {
+        content: newComment.trim(),
+      });
+      setComments((prev) => [...prev, response.data]);
+      setNewComment('');
+    } catch (err) {
+      console.warn('Backend comment endpoint not ready, adding locally:', err);
+      setComments((prev) => [
+        ...prev,
+        {
+          id: 'c-' + Date.now(),
+          content: newComment.trim(),
+          authorId: localStorage.getItem('user_name') || 'User',
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      setNewComment('');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -41,7 +58,9 @@ const InlineTicketModal: React.FC<{
             </span>
             <span
               className={`text-xs px-2.5 py-1 rounded font-bold ${
-                ticket.priority === 'Urgent' ? 'bg-red-500 text-white' : 'bg-slate-600 text-slate-100'
+                ticket.priority === 'Urgent' || ticket.priority === 'URGENT'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-slate-600 text-slate-100'
               }`}
             >
               {ticket.priority} Priority
@@ -62,7 +81,7 @@ const InlineTicketModal: React.FC<{
               </span>
               <span className="flex items-center space-x-1">
                 <Tag size={14} />
-                <span>{ticket.category}</span>
+                <span>{ticket.category || 'General'}</span>
               </span>
               <span className="flex items-center space-x-1">
                 <Clock size={14} />
@@ -91,10 +110,10 @@ const InlineTicketModal: React.FC<{
                 comments.map((c) => (
                   <div key={c.id} className="bg-slate-100 p-3 rounded-lg text-xs">
                     <div className="flex justify-between items-center text-slate-500 font-semibold mb-1">
-                      <span>{c.author}</span>
-                      <span>{c.timestamp}</span>
+                      <span>{c.authorId}</span>
+                      <span>{new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
-                    <p className="text-slate-700">{c.text}</p>
+                    <p className="text-slate-700">{c.content}</p>
                   </div>
                 ))
               )}
@@ -110,10 +129,11 @@ const InlineTicketModal: React.FC<{
               />
               <button
                 type="submit"
+                disabled={submitting}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center space-x-1 transition"
               >
                 <Send size={14} />
-                <span>Send</span>
+                <span>{submitting ? 'Sending...' : 'Send'}</span>
               </button>
             </form>
           </div>
@@ -133,9 +153,13 @@ export const MyTickets: React.FC = () => {
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        const response = await apiClient.get('/tickets/my-tickets');
+        // Calls GET /tickets (matches router.get('/', getTickets))
+        const response = await apiClient.get('/tickets');
+
         if (Array.isArray(response.data)) {
           setTickets(response.data);
+        } else if (Array.isArray(response.data.tickets)) {
+          setTickets(response.data.tickets);
         } else {
           setTickets([]);
         }
@@ -163,7 +187,7 @@ export const MyTickets: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to delete ticket on backend:', err);
-      alert('Could not delete ticket from server.');
+      alert('Could not delete ticket from server. Check if delete endpoint is added on backend.');
     }
   };
 
@@ -174,6 +198,7 @@ export const MyTickets: React.FC = () => {
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center space-x-4 mb-6">
           <button
+            type="button"
             onClick={() => navigate('/submit')}
             className="flex items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-medium text-sm transition"
           >
@@ -205,7 +230,9 @@ export const MyTickets: React.FC = () => {
                       </span>
                       <span
                         className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                          t.priority === 'Urgent' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
+                          t.priority === 'Urgent' || t.priority === 'URGENT'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-slate-100 text-slate-700'
                         }`}
                       >
                         {t.priority}
@@ -213,18 +240,21 @@ export const MyTickets: React.FC = () => {
                     </div>
                     <h3 className="font-bold text-slate-800 mt-1">{t.title}</h3>
                     <p className="text-sm text-slate-500 mt-0.5">
-                      Room: {t.roomNumber} • Category: {t.category}
+                      Room: {t.roomNumber} • Category: {t.category || 'General'}
                     </p>
                   </div>
                   <div className="flex items-center space-x-3">
                     <span
                       className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                        t.status === 'Open' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                        t.status === 'Open' || t.status === 'OPEN'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-blue-100 text-blue-700'
                       }`}
                     >
                       {t.status}
                     </span>
                     <button
+                      type="button"
                       onClick={(e) => handleDelete(e, t.id)}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                       title="Delete Ticket"

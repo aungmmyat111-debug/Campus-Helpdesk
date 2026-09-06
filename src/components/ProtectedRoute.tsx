@@ -8,13 +8,20 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
   const token = localStorage.getItem('app_jwt');
-  const userRole = localStorage.getItem('user_role') as UserRole;
+  const userRole = localStorage.getItem('user_role');
 
   if (!token) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!userRole || !allowedRoles.includes(userRole)) {
+  const isAuthorized = 
+    userRole && (
+      allowedRoles.includes(userRole as UserRole) ||
+      (userRole === 'ADMINISTRATOR' && allowedRoles.includes('ADMIN' as UserRole)) ||
+      (userRole === 'ADMIN' && allowedRoles.includes('ADMINISTRATOR' as UserRole))
+    );
+
+  if (!isAuthorized) {
     return <Navigate to="/unauthorized" replace />;
   }
 

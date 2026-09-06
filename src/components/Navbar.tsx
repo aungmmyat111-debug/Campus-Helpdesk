@@ -1,17 +1,36 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LogOut, Ticket, PlusCircle, Shield, LayoutDashboard } from 'lucide-react';
+import { useMsal } from '@azure/msal-react';
 import type { UserRole } from '../types';
 
 export const Navbar: React.FC = () => {
+  const { instance } = useMsal();
   const navigate = useNavigate();
   const userRole = localStorage.getItem('user_role') as UserRole;
   const userName = localStorage.getItem('user_name') || 'User';
 
+  const isTechnician = 
+    userRole === 'TECHNICIAN' || 
+    userRole === 'Technician' || 
+    userRole === 'ADMINISTRATOR' || 
+    userRole === 'Administrator' || 
+    userRole === 'ADMIN';
+
+  const isAdmin = 
+    userRole === 'ADMINISTRATOR' || 
+    userRole === 'Administrator' || 
+    userRole === 'ADMIN';
+
   const handleLogout = () => {
-    localStorage.removeItem('app_jwt');
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('user_name');
+    // 1. Wipe local application storage & tokens
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // 2. Clear active account state from MSAL memory
+    instance.setActiveAccount(null);
+
+    // 3. Redirect directly back to login page without calling MS global logout page
     navigate('/login');
   };
 
@@ -27,13 +46,13 @@ export const Navbar: React.FC = () => {
             <Ticket size={16} /> <span>My Tickets</span>
           </Link>
 
-          {(userRole === 'Technician' || userRole === 'Administrator') && (
-            <Link to="/technician" className="flex items-center space-x-1 hover:text-indigo-300 text-sm">
+          {isTechnician && (
+            <Link to="/dashboard" className="flex items-center space-x-1 hover:text-indigo-300 text-sm">
               <LayoutDashboard size={16} /> <span>Technician Portal</span>
             </Link>
           )}
 
-          {userRole === 'Administrator' && (
+          {isAdmin && (
             <Link to="/admin" className="flex items-center space-x-1 hover:text-indigo-300 text-sm">
               <Shield size={16} /> <span>Admin Panel</span>
             </Link>
@@ -46,8 +65,9 @@ export const Navbar: React.FC = () => {
           {userName} ({userRole})
         </span>
         <button
+          type="button"
           onClick={handleLogout}
-          className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded transition"
+          className="flex items-center space-x-1 bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded transition cursor-pointer"
         >
           <LogOut size={16} /> <span>Logout</span>
         </button>

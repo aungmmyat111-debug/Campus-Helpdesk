@@ -9,11 +9,27 @@ import './index.css';
 const msalInstance = new PublicClientApplication(msalConfig);
 
 msalInstance.initialize().then(() => {
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-      <MsalProvider instance={msalInstance}>
-        <App />
-      </MsalProvider>
-    </React.StrictMode>
-  );
+  
+  msalInstance.handleRedirectPromise().then((response) => {
+    if (response) {
+      msalInstance.setActiveAccount(response.account);
+    } else {
+      
+      const accounts = msalInstance.getAllAccounts();
+      if (accounts.length > 0) {
+        msalInstance.setActiveAccount(accounts[0]);
+      }
+    }
+
+    // Render the React app ONLY after redirect promise completes
+    ReactDOM.createRoot(document.getElementById('root')!).render(
+      <React.StrictMode>
+        <MsalProvider instance={msalInstance}>
+          <App />
+        </MsalProvider>
+      </React.StrictMode>
+    );
+  }).catch((error) => {
+    console.error('MSAL Redirect Error:', error);
+  });
 });

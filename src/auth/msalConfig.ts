@@ -2,16 +2,19 @@ import type { Configuration, RedirectRequest } from '@azure/msal-browser';
 
 export const msalConfig: Configuration = {
   auth: {
-    clientId: '00000000-0000-0000-0000-000000000000', // Replace with real Azure AD Client ID when provided
+    clientId: 'e8530b7c-5661-410c-a217-49c518f371ca',
     authority: 'https://login.microsoftonline.com/common',
-    redirectUri: window.location.origin + '/helpdesk/',
+    redirectUri: window.location.origin,
+    navigateToLoginRequestUrl: false,
+    postLogoutRedirectUri: 'http://localhost:5173/login',
   },
   cache: {
-    cacheLocation: 'sessionStorage',
-    storeAuthStateInCookie: false,
+    cacheLocation: 'localStorage',
+    storeAuthStateInCookie: true, 
   },
 };
 
 export const loginRequest: RedirectRequest = {
   scopes: ['User.Read'],
+  prompt: 'select_account', 
 };

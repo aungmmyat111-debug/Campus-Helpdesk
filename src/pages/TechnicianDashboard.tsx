@@ -40,7 +40,9 @@ const TechTicketModal: React.FC<{
             </span>
             <span
               className={`text-xs px-2.5 py-1 rounded font-bold ${
-                ticket.priority === 'Urgent' ? 'bg-red-500 text-white' : 'bg-slate-600 text-slate-100'
+                ticket.priority === 'Urgent' || ticket.priority === 'URGENT'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-slate-600 text-slate-100'
               }`}
             >
               {ticket.priority} Priority
@@ -61,7 +63,7 @@ const TechTicketModal: React.FC<{
               </span>
               <span className="flex items-center space-x-1">
                 <Tag size={14} />
-                <span>{ticket.category}</span>
+                <span>{ticket.category || 'General'}</span>
               </span>
               <span className="flex items-center space-x-1">
                 <Clock size={14} />
@@ -130,9 +132,13 @@ export const TechnicianDashboard: React.FC = () => {
 
   const fetchTickets = async () => {
     try {
-      const response = await apiClient.get('/tickets/all');
+      // Changed from /tickets/all to /tickets to match backend router
+      const response = await apiClient.get('/tickets');
+      
       if (Array.isArray(response.data)) {
         setTickets(response.data);
+      } else if (Array.isArray(response.data.tickets)) {
+        setTickets(response.data.tickets);
       } else {
         setTickets([]);
       }
@@ -152,9 +158,10 @@ export const TechnicianDashboard: React.FC = () => {
   const handleClaim = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      await apiClient.patch(`/tickets/${id}/claim`);
+      // Calls PATCH /tickets/:id on backend
+      await apiClient.patch(`/tickets/${id}`, { status: 'IN_PROGRESS' });
       setTickets((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, status: 'In Progress' } : t))
+        prev.map((t) => (t.id === id ? { ...t, status: 'IN_PROGRESS' } : t))
       );
     } catch (err) {
       console.error('Failed to claim ticket:', err);
@@ -165,9 +172,10 @@ export const TechnicianDashboard: React.FC = () => {
   const handleResolve = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      await apiClient.patch(`/tickets/${id}/status`, { status: 'Resolved' });
+      // Calls PATCH /tickets/:id on backend
+      await apiClient.patch(`/tickets/${id}`, { status: 'RESOLVED' });
       setTickets((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, status: 'Resolved' } : t))
+        prev.map((t) => (t.id === id ? { ...t, status: 'RESOLVED' } : t))
       );
     } catch (err) {
       console.error('Failed to resolve ticket:', err);
@@ -209,11 +217,15 @@ export const TechnicianDashboard: React.FC = () => {
                     <div className="font-semibold text-slate-800">{t.title}</div>
                     <div className="text-xs text-slate-500">Room: {t.roomNumber}</div>
                   </td>
-                  <td className="p-3 text-slate-600">{t.category}</td>
+                  <td className="p-3 text-slate-600">{t.category || 'General'}</td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 text-xs rounded font-bold ${
-                      t.priority === 'Urgent' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
-                    }`}>
+                    <span
+                      className={`px-2 py-0.5 text-xs rounded font-bold ${
+                        t.priority === 'Urgent' || t.priority === 'URGENT'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
                       {t.priority}
                     </span>
                   </td>

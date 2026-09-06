@@ -21,12 +21,14 @@ export const AdminPanel: React.FC = () => {
         const response = await apiClient.get('/users');
         if (Array.isArray(response.data)) {
           setUsers(response.data);
+        } else if (Array.isArray(response.data.users)) {
+          setUsers(response.data.users);
         } else {
           setUsers([]);
         }
       } catch (err) {
         console.error('Failed to load users:', err);
-        setError('Unable to fetch users from database.');
+        setError('Backend route missing: Ask your teammate to add router.get("/users") in Express.');
         setUsers([]);
       } finally {
         setLoading(false);
