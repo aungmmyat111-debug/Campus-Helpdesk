@@ -4,35 +4,6 @@ import { Navbar } from '../components/Navbar';
 import apiClient from '../api/client';
 import type { Ticket } from '../types';
 
-const MOCK_TECHNICIAN_TICKETS: Ticket[] = [
-  {
-    id: 'TICK-1001',
-    title: 'Projector Not Working',
-    description: 'The HDMI connection is not outputting display.',
-    roomNumber: 'A-101',
-    status: 'Open',
-    priority: 'Medium',
-    category: 'Hardware',
-    eventActive: false,
-    createdById: 'user-1',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'TICK-1002',
-    title: 'Wi-Fi Drops Constantly',
-    description: 'Lab 402 loses connection during active lecture.',
-    roomNumber: 'Lab-402',
-    status: 'In Progress',
-    priority: 'Urgent',
-    category: 'Network',
-    eventActive: true,
-    createdById: 'user-2',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
 // Inline Modal for Technician Ticket Details
 const TechTicketModal: React.FC<{
   ticket: Ticket | null;
@@ -40,14 +11,7 @@ const TechTicketModal: React.FC<{
 }> = ({ ticket, onClose }) => {
   if (!ticket) return null;
 
-  const [comments, setComments] = useState([
-    {
-      id: 'c1',
-      author: 'IT Dispatch',
-      text: 'Assigned to Technician queue.',
-      timestamp: '09:30 AM',
-    },
-  ]);
+  const [comments, setComments] = useState<Array<{ id: string; author: string; text: string; timestamp: string }>>([]);
   const [newComment, setNewComment] = useState('');
 
   const handleAddComment = (e: React.FormEvent) => {
@@ -58,7 +22,7 @@ const TechTicketModal: React.FC<{
       ...prev,
       {
         id: 'c-' + Date.now(),
-        author: 'Technician Staff',
+        author: localStorage.getItem('user_name') || 'Technician Staff',
         text: newComment.trim(),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
@@ -101,7 +65,7 @@ const TechTicketModal: React.FC<{
               </span>
               <span className="flex items-center space-x-1">
                 <Clock size={14} />
-                <span>Created recently</span>
+                <span>Created {new Date(ticket.createdAt).toLocaleDateString()}</span>
               </span>
             </div>
           </div>
@@ -120,15 +84,19 @@ const TechTicketModal: React.FC<{
             </h3>
 
             <div className="space-y-3 mb-4 max-h-48 overflow-y-auto pr-1">
-              {comments.map((c) => (
-                <div key={c.id} className="bg-slate-100 p-3 rounded-lg text-xs">
-                  <div className="flex justify-between items-center text-slate-500 font-semibold mb-1">
-                    <span>{c.author}</span>
-                    <span>{c.timestamp}</span>
+              {comments.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No notes posted yet.</p>
+              ) : (
+                comments.map((c) => (
+                  <div key={c.id} className="bg-slate-100 p-3 rounded-lg text-xs">
+                    <div className="flex justify-between items-center text-slate-500 font-semibold mb-1">
+                      <span>{c.author}</span>
+                      <span>{c.timestamp}</span>
+                    </div>
+                    <p className="text-slate-700">{c.text}</p>
                   </div>
-                  <p className="text-slate-700">{c.text}</p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <form onSubmit={handleAddComment} className="flex gap-2">
@@ -155,8 +123,9 @@ const TechTicketModal: React.FC<{
 };
 
 export const TechnicianDashboard: React.FC = () => {
-  const [tickets, setTickets] = useState<Ticket[]>(MOCK_TECHNICIAN_TICKETS);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   const fetchTickets = async () => {
@@ -165,11 +134,12 @@ export const TechnicianDashboard: React.FC = () => {
       if (Array.isArray(response.data)) {
         setTickets(response.data);
       } else {
-        setTickets(MOCK_TECHNICIAN_TICKETS);
+        setTickets([]);
       }
     } catch (err) {
-      console.warn('Backend unavailable, loading mock queue:', err);
-      setTickets(MOCK_TECHNICIAN_TICKETS);
+      console.error('Failed to load technician queue:', err);
+      setError('Unable to retrieve tickets from database.');
+      setTickets([]);
     } finally {
       setLoading(false);
     }
@@ -179,23 +149,31 @@ export const TechnicianDashboard: React.FC = () => {
     fetchTickets();
   }, []);
 
-  const handleClaim = (e: React.MouseEvent, id: string) => {
+  const handleClaim = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    apiClient.patch(`/tickets/${id}/claim`).catch(() => {});
-    setTickets((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: 'In Progress' } : t))
-    );
+    try {
+      await apiClient.patch(`/tickets/${id}/claim`);
+      setTickets((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: 'In Progress' } : t))
+      );
+    } catch (err) {
+      console.error('Failed to claim ticket:', err);
+      alert('Could not claim ticket on server.');
+    }
   };
 
-  const handleResolve = (e: React.MouseEvent, id: string) => {
+  const handleResolve = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    apiClient.patch(`/tickets/${id}/status`, { status: 'Resolved' }).catch(() => {});
-    setTickets((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status: 'Resolved' } : t))
-    );
+    try {
+      await apiClient.patch(`/tickets/${id}/status`, { status: 'Resolved' });
+      setTickets((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: 'Resolved' } : t))
+      );
+    } catch (err) {
+      console.error('Failed to resolve ticket:', err);
+      alert('Could not update ticket status on server.');
+    }
   };
-
-  const safeTickets = Array.isArray(tickets) ? tickets : [];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -205,6 +183,10 @@ export const TechnicianDashboard: React.FC = () => {
 
         {loading ? (
           <div className="p-8 text-center text-slate-500">Loading technician portal...</div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-500 font-semibold">{error}</div>
+        ) : tickets.length === 0 ? (
+          <p className="text-slate-500 text-center py-8">No open tickets in queue.</p>
         ) : (
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-100 text-slate-700">
@@ -217,7 +199,7 @@ export const TechnicianDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {safeTickets.map((t) => (
+              {tickets.map((t) => (
                 <tr
                   key={t.id}
                   onClick={() => setSelectedTicket(t)}

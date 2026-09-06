@@ -8,7 +8,6 @@ export const LoginPage: React.FC = () => {
   const { instance } = useMsal();
   const navigate = useNavigate();
 
-  // REAL MSAL LOGIN
   const handleLogin = async () => {
     try {
       const loginResponse = await instance.loginPopup(loginRequest);
@@ -26,14 +25,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // DEV MOCK LOGIN (Use this until real Azure keys arrive)
-  const handleDevLogin = (role: 'Student' | 'Technician' | 'Administrator') => {
-    localStorage.setItem('app_jwt', 'mock_dev_jwt_token');
-    localStorage.setItem('user_role', role);
-    localStorage.setItem('user_name', `Dev ${role}`);
-    navigate('/submit');
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100">
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
@@ -42,25 +33,10 @@ export const LoginPage: React.FC = () => {
         
         <button
           onClick={handleLogin}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-lg shadow transition flex items-center justify-center mb-4"
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-lg shadow transition flex items-center justify-center"
         >
           <span>Sign in with Microsoft AD</span>
         </button>
-
-        <div className="border-t border-slate-200 pt-4 mt-4">
-          <p className="text-xs text-slate-400 font-semibold mb-2 uppercase">Dev Quick Switch</p>
-          <div className="flex justify-center space-x-2">
-            <button onClick={() => handleDevLogin('Student')} className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded">
-              Student
-            </button>
-            <button onClick={() => handleDevLogin('Technician')} className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded">
-              Technician
-            </button>
-            <button onClick={() => handleDevLogin('Administrator')} className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded">
-              Admin
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -5,35 +5,6 @@ import { Navbar } from '../components/Navbar';
 import apiClient from '../api/client';
 import type { Ticket } from '../types';
 
-const MOCK_TICKETS: Ticket[] = [
-  {
-    id: 'TICK-1001',
-    title: 'Projector Not Working',
-    description: 'The HDMI connection is not outputting display.',
-    roomNumber: 'A-101',
-    status: 'Open',
-    priority: 'Medium',
-    category: 'Hardware',
-    eventActive: false,
-    createdById: 'user-1',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'TICK-1002',
-    title: 'Wi-Fi Drops Constantly',
-    description: 'Lab 402 loses connection during active lecture.',
-    roomNumber: 'Lab-402',
-    status: 'In Progress',
-    priority: 'Urgent',
-    category: 'Network',
-    eventActive: true,
-    createdById: 'user-1',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
 // Inline Ticket Detail Modal Component
 const InlineTicketModal: React.FC<{
   ticket: Ticket | null;
@@ -41,14 +12,7 @@ const InlineTicketModal: React.FC<{
 }> = ({ ticket, onClose }) => {
   if (!ticket) return null;
 
-  const [comments, setComments] = useState([
-    {
-      id: 'c1',
-      author: 'IT Support Bot',
-      text: 'Ticket created and routed to queue.',
-      timestamp: '10:00 AM',
-    },
-  ]);
+  const [comments, setComments] = useState<Array<{ id: string; author: string; text: string; timestamp: string }>>([]);
   const [newComment, setNewComment] = useState('');
 
   const handleAddComment = (e: React.FormEvent) => {
@@ -59,7 +23,7 @@ const InlineTicketModal: React.FC<{
       ...prev,
       {
         id: 'c-' + Date.now(),
-        author: 'Dev User',
+        author: localStorage.getItem('user_name') || 'User',
         text: newComment.trim(),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
@@ -102,7 +66,7 @@ const InlineTicketModal: React.FC<{
               </span>
               <span className="flex items-center space-x-1">
                 <Clock size={14} />
-                <span>Created recently</span>
+                <span>Created {new Date(ticket.createdAt).toLocaleDateString()}</span>
               </span>
             </div>
           </div>
@@ -121,15 +85,19 @@ const InlineTicketModal: React.FC<{
             </h3>
 
             <div className="space-y-3 mb-4 max-h-48 overflow-y-auto pr-1">
-              {comments.map((c) => (
-                <div key={c.id} className="bg-slate-100 p-3 rounded-lg text-xs">
-                  <div className="flex justify-between items-center text-slate-500 font-semibold mb-1">
-                    <span>{c.author}</span>
-                    <span>{c.timestamp}</span>
+              {comments.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No comments yet.</p>
+              ) : (
+                comments.map((c) => (
+                  <div key={c.id} className="bg-slate-100 p-3 rounded-lg text-xs">
+                    <div className="flex justify-between items-center text-slate-500 font-semibold mb-1">
+                      <span>{c.author}</span>
+                      <span>{c.timestamp}</span>
+                    </div>
+                    <p className="text-slate-700">{c.text}</p>
                   </div>
-                  <p className="text-slate-700">{c.text}</p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <form onSubmit={handleAddComment} className="flex gap-2">
@@ -157,8 +125,9 @@ const InlineTicketModal: React.FC<{
 
 export const MyTickets: React.FC = () => {
   const navigate = useNavigate();
-  const [tickets, setTickets] = useState<Ticket[]>(MOCK_TICKETS);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   useEffect(() => {
@@ -168,11 +137,12 @@ export const MyTickets: React.FC = () => {
         if (Array.isArray(response.data)) {
           setTickets(response.data);
         } else {
-          setTickets(MOCK_TICKETS);
+          setTickets([]);
         }
-      } catch (err) {
-        console.warn('Backend unavailable, rendering mock tickets:', err);
-        setTickets(MOCK_TICKETS);
+      } catch (err: any) {
+        console.error('Failed to load tickets from backend:', err);
+        setError('Failed to fetch tickets from live server.');
+        setTickets([]);
       } finally {
         setLoading(false);
       }
@@ -187,17 +157,15 @@ export const MyTickets: React.FC = () => {
 
     try {
       await apiClient.delete(`/tickets/${id}`);
-    } catch (err) {
-      console.warn('Backend unavailable, removing ticket locally.');
-    } finally {
       setTickets((prev) => prev.filter((ticket) => ticket.id !== id));
       if (selectedTicket?.id === id) {
         setSelectedTicket(null);
       }
+    } catch (err) {
+      console.error('Failed to delete ticket on backend:', err);
+      alert('Could not delete ticket from server.');
     }
   };
-
-  const safeTickets = Array.isArray(tickets) ? tickets : [];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -216,13 +184,15 @@ export const MyTickets: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-slate-500">Loading tickets...</div>
+          <div className="p-8 text-center text-slate-500">Loading tickets from database...</div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-500 font-semibold">{error}</div>
         ) : (
           <div className="space-y-4">
-            {safeTickets.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">No tickets found.</p>
+            {tickets.length === 0 ? (
+              <p className="text-slate-500 text-center py-8">No tickets found in database.</p>
             ) : (
-              safeTickets.map((t) => (
+              tickets.map((t) => (
                 <div
                   key={t.id}
                   onClick={() => setSelectedTicket(t)}
