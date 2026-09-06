@@ -1,38 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { X, Send, MessageSquare, MapPin, Tag, Clock } from 'lucide-react';
+import { X, MapPin, Tag, Clock, AlertCircle } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import apiClient from '../api/client';
 import type { Ticket } from '../types';
 
-// Inline Modal for Technician Ticket Details
+// Inline Modal for Technician Ticket Details (Without Comments/Notes)
 const TechTicketModal: React.FC<{
   ticket: Ticket | null;
   onClose: () => void;
 }> = ({ ticket, onClose }) => {
   if (!ticket) return null;
 
-  const [comments, setComments] = useState<Array<{ id: string; author: string; text: string; timestamp: string }>>([]);
-  const [newComment, setNewComment] = useState('');
-
-  const handleAddComment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-
-    setComments((prev) => [
-      ...prev,
-      {
-        id: 'c-' + Date.now(),
-        author: localStorage.getItem('user_name') || 'Technician Staff',
-        text: newComment.trim(),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
-    setNewComment('');
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col">
+        {/* Header */}
         <div className="p-5 bg-slate-800 text-white flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <span className="font-mono text-xs bg-slate-700 px-2.5 py-1 rounded text-slate-200">
@@ -48,12 +30,16 @@ const TechTicketModal: React.FC<{
               {ticket.priority} Priority
             </span>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg">
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+          >
             <X size={20} />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-6">
+        {/* Content Body */}
+        <div className="p-6 space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">{ticket.title}</h2>
             <div className="flex items-center space-x-4 text-xs text-slate-500 mt-2">
@@ -78,46 +64,6 @@ const TechTicketModal: React.FC<{
             </h4>
             <p className="text-slate-700 text-sm whitespace-pre-line">{ticket.description}</p>
           </div>
-
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center space-x-2">
-              <MessageSquare size={16} />
-              <span>Technician Notes & Updates</span>
-            </h3>
-
-            <div className="space-y-3 mb-4 max-h-48 overflow-y-auto pr-1">
-              {comments.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">No notes posted yet.</p>
-              ) : (
-                comments.map((c) => (
-                  <div key={c.id} className="bg-slate-100 p-3 rounded-lg text-xs">
-                    <div className="flex justify-between items-center text-slate-500 font-semibold mb-1">
-                      <span>{c.author}</span>
-                      <span>{c.timestamp}</span>
-                    </div>
-                    <p className="text-slate-700">{c.text}</p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <form onSubmit={handleAddComment} className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Post technician note..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                className="flex-1 text-xs border border-slate-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center space-x-1 transition"
-              >
-                <Send size={14} />
-                <span>Add Note</span>
-              </button>
-            </form>
-          </div>
         </div>
       </div>
     </div>
@@ -128,11 +74,13 @@ export const TechnicianDashboard: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+
+  const userRole = localStorage.getItem('user_role');
 
   const fetchTickets = async () => {
     try {
-      // Changed from /tickets/all to /tickets to match backend router
       const response = await apiClient.get('/tickets');
       
       if (Array.isArray(response.data)) {
@@ -157,29 +105,43 @@ export const TechnicianDashboard: React.FC = () => {
 
   const handleClaim = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    setActionError(null);
+
+    if (userRole === 'ADMINISTRATOR' || userRole === 'ADMIN') {
+      setActionError('Access Denied: Only designated Technicians can claim or update ticket statuses.');
+      return;
+    }
+
     try {
-      // Calls PATCH /tickets/:id on backend
       await apiClient.patch(`/tickets/${id}`, { status: 'IN_PROGRESS' });
       setTickets((prev) =>
         prev.map((t) => (t.id === id ? { ...t, status: 'IN_PROGRESS' } : t))
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to claim ticket:', err);
-      alert('Could not claim ticket on server.');
+      const serverMsg = err.response?.data?.error || err.response?.data?.message;
+      setActionError(serverMsg || 'Access Denied: Action restricted to Technicians.');
     }
   };
 
   const handleResolve = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    setActionError(null);
+
+    if (userRole === 'ADMINISTRATOR' || userRole === 'ADMIN') {
+      setActionError('Access Denied: Only designated Technicians can claim or update ticket statuses.');
+      return;
+    }
+
     try {
-      // Calls PATCH /tickets/:id on backend
       await apiClient.patch(`/tickets/${id}`, { status: 'RESOLVED' });
       setTickets((prev) =>
         prev.map((t) => (t.id === id ? { ...t, status: 'RESOLVED' } : t))
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to resolve ticket:', err);
-      alert('Could not update ticket status on server.');
+      const serverMsg = err.response?.data?.error || err.response?.data?.message;
+      setActionError(serverMsg || 'Access Denied: Action restricted to Technicians.');
     }
   };
 
@@ -188,6 +150,22 @@ export const TechnicianDashboard: React.FC = () => {
       <Navbar />
       <div className="max-w-5xl mx-auto mt-8 p-6 bg-white rounded-xl shadow-sm border border-slate-200">
         <h2 className="text-xl font-bold text-slate-800 mb-4">Technician Queue</h2>
+
+        {actionError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <AlertCircle size={16} className="shrink-0 text-red-600" />
+              <span>{actionError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              className="text-red-500 hover:text-red-700 font-bold ml-4 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="p-8 text-center text-slate-500">Loading technician portal...</div>
@@ -236,14 +214,16 @@ export const TechnicianDashboard: React.FC = () => {
                   </td>
                   <td className="p-3 space-x-2">
                     <button
+                      type="button"
                       onClick={(e) => handleClaim(e, t.id)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition"
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs transition cursor-pointer"
                     >
                       Claim
                     </button>
                     <button
+                      type="button"
                       onClick={(e) => handleResolve(e, t.id)}
-                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition"
+                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition cursor-pointer"
                     >
                       Resolve
                     </button>

@@ -26,9 +26,10 @@ export const AdminPanel: React.FC = () => {
         } else {
           setUsers([]);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to load users:', err);
-        setError('Backend route missing: Ask your teammate to add router.get("/users") in Express.');
+        const serverMsg = err.response?.data?.error || err.response?.data?.message;
+        setError(serverMsg || 'Failed to retrieve user directory from backend.');
         setUsers([]);
       } finally {
         setLoading(false);
@@ -38,15 +39,19 @@ export const AdminPanel: React.FC = () => {
     fetchUsers();
   }, []);
 
-  const handleRoleChange = async (id: string, newRole: UserRole) => {
+  const handleRoleChange = async (id: string, newRole: string) => {
+    // Send uppercase string format to align with backend enum validation
+    const formattedRole = newRole.toUpperCase() as UserRole;
+
     try {
-      await apiClient.patch(`/users/${id}/role`, { role: newRole });
+      await apiClient.patch(`/users/${id}/role`, { role: formattedRole });
       setUsers((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, role: newRole } : u))
+        prev.map((u) => (u.id === id ? { ...u, role: formattedRole } : u))
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update user role on server:', err);
-      alert('Could not update role on backend.');
+      const message = err.response?.data?.error || 'Could not update role on backend.';
+      alert(message);
     }
   };
 
@@ -85,14 +90,14 @@ export const AdminPanel: React.FC = () => {
                   </td>
                   <td className="p-3">
                     <select
-                      value={u.role}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
-                      className="text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={u.role?.toUpperCase()}
+                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      className="text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                     >
-                      <option value="Student">Student</option>
-                      <option value="Faculty">Faculty</option>
-                      <option value="Technician">Technician</option>
-                      <option value="Administrator">Administrator</option>
+                      <option value="STUDENT">Student</option>
+                      <option value="FACULTY">Faculty</option>
+                      <option value="TECHNICIAN">Technician</option>
+                      <option value="ADMINISTRATOR">Administrator</option>
                     </select>
                   </td>
                 </tr>

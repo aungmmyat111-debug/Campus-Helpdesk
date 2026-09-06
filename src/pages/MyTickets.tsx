@@ -1,56 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, X, Send, MessageSquare, MapPin, Tag, Clock } from 'lucide-react';
+import { ArrowLeft, Trash2, X, MapPin, Tag, Clock } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import apiClient from '../api/client';
-import type { Ticket, Comment } from '../types';
+import type { Ticket } from '../types';
 
-// Inline Ticket Detail Modal Component
+// Inline Ticket Detail Modal Component (Without Comments)
 const InlineTicketModal: React.FC<{
   ticket: Ticket | null;
   onClose: () => void;
 }> = ({ ticket, onClose }) => {
   if (!ticket) return null;
 
-  const [comments, setComments] = useState<Comment[]>(ticket.comments || []);
-  const [newComment, setNewComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    setComments(ticket.comments || []);
-  }, [ticket]);
-
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-
-    setSubmitting(true);
-    try {
-      const response = await apiClient.post(`/tickets/${ticket.id}/comments`, {
-        content: newComment.trim(),
-      });
-      setComments((prev) => [...prev, response.data]);
-      setNewComment('');
-    } catch (err) {
-      console.warn('Backend comment endpoint not ready, adding locally:', err);
-      setComments((prev) => [
-        ...prev,
-        {
-          id: 'c-' + Date.now(),
-          content: newComment.trim(),
-          authorId: localStorage.getItem('user_name') || 'User',
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      setNewComment('');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col">
+        {/* Header */}
         <div className="p-5 bg-slate-800 text-white flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <span className="font-mono text-xs bg-slate-700 px-2.5 py-1 rounded text-slate-200">
@@ -66,12 +31,16 @@ const InlineTicketModal: React.FC<{
               {ticket.priority} Priority
             </span>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg">
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+          >
             <X size={20} />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-6">
+        {/* Content Body */}
+        <div className="p-6 space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">{ticket.title}</h2>
             <div className="flex items-center space-x-4 text-xs text-slate-500 mt-2">
@@ -85,7 +54,9 @@ const InlineTicketModal: React.FC<{
               </span>
               <span className="flex items-center space-x-1">
                 <Clock size={14} />
-                <span>Created {new Date(ticket.createdAt).toLocaleDateString()}</span>
+                <span>
+                  Created {new Date(ticket.createdAt).toLocaleDateString()}
+                </span>
               </span>
             </div>
           </div>
@@ -94,48 +65,9 @@ const InlineTicketModal: React.FC<{
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
               Description
             </h4>
-            <p className="text-slate-700 text-sm whitespace-pre-line">{ticket.description}</p>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center space-x-2">
-              <MessageSquare size={16} />
-              <span>Activity & Comments</span>
-            </h3>
-
-            <div className="space-y-3 mb-4 max-h-48 overflow-y-auto pr-1">
-              {comments.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">No comments yet.</p>
-              ) : (
-                comments.map((c) => (
-                  <div key={c.id} className="bg-slate-100 p-3 rounded-lg text-xs">
-                    <div className="flex justify-between items-center text-slate-500 font-semibold mb-1">
-                      <span>{c.authorId}</span>
-                      <span>{new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                    <p className="text-slate-700">{c.content}</p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <form onSubmit={handleAddComment} className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Add a comment or update..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                className="flex-1 text-xs border border-slate-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <button
-                type="submit"
-                disabled={submitting}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center space-x-1 transition"
-              >
-                <Send size={14} />
-                <span>{submitting ? 'Sending...' : 'Send'}</span>
-              </button>
-            </form>
+            <p className="text-slate-700 text-sm whitespace-pre-line">
+              {ticket.description}
+            </p>
           </div>
         </div>
       </div>
@@ -153,7 +85,6 @@ export const MyTickets: React.FC = () => {
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        // Calls GET /tickets (matches router.get('/', getTickets))
         const response = await apiClient.get('/tickets');
 
         if (Array.isArray(response.data)) {
@@ -200,7 +131,7 @@ export const MyTickets: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/submit')}
-            className="flex items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-medium text-sm transition"
+            className="flex items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-medium text-sm transition cursor-pointer"
           >
             <ArrowLeft size={16} />
             <span>Back to Submit Ticket</span>
@@ -256,7 +187,7 @@ export const MyTickets: React.FC = () => {
                     <button
                       type="button"
                       onClick={(e) => handleDelete(e, t.id)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
                       title="Delete Ticket"
                     >
                       <Trash2 size={18} />
