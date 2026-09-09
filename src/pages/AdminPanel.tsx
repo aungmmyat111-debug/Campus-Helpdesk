@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import apiClient from '../api/client';
 import type { UserRole } from '../types';
@@ -14,6 +15,9 @@ export const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Retrieve current user ID to prevent self-deletion UI options
+  const currentUserId = localStorage.getItem('user_id');
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -40,7 +44,6 @@ export const AdminPanel: React.FC = () => {
   }, []);
 
   const handleRoleChange = async (id: string, newRole: string) => {
-    // Send uppercase string format to align with backend enum validation
     const formattedRole = newRole.toUpperCase() as UserRole;
 
     try {
@@ -51,6 +54,21 @@ export const AdminPanel: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to update user role on server:', err);
       const message = err.response?.data?.error || 'Could not update role on backend.';
+      alert(message);
+    }
+  };
+
+  const handleDeleteUser = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete user "${name}"?`)) {
+      return;
+    }
+
+    try {
+      await apiClient.delete(`/users/${id}`);
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (err: any) {
+      console.error('Failed to delete user account:', err);
+      const message = err.response?.data?.error || 'Could not delete user from server.';
       alert(message);
     }
   };
@@ -89,16 +107,30 @@ export const AdminPanel: React.FC = () => {
                     </span>
                   </td>
                   <td className="p-3">
-                    <select
-                      value={u.role?.toUpperCase()}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                      className="text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                    >
-                      <option value="STUDENT">Student</option>
-                      <option value="FACULTY">Faculty</option>
-                      <option value="TECHNICIAN">Technician</option>
-                      <option value="ADMINISTRATOR">Administrator</option>
-                    </select>
+                    <div className="flex items-center space-x-3">
+                      <select
+                        value={u.role?.toUpperCase()}
+                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                        className="text-xs border border-slate-300 rounded p-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                      >
+                        <option value="STUDENT">Student</option>
+                        <option value="FACULTY">Faculty</option>
+                        <option value="TECHNICIAN">Technician</option>
+                        <option value="ADMINISTRATOR">Administrator</option>
+                      </select>
+
+                      {/* Hide trash icon for current logged-in Admin */}
+                      {u.id !== currentUserId && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUser(u.id, u.name)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                          title="Delete User Account"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

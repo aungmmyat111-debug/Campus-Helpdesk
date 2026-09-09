@@ -100,9 +100,16 @@ export const LoginPage: React.FC = () => {
           const userRole = response.data.user?.role || computedRole;
           const userName = response.data.user?.name || activeAccount.name || 'User';
 
+          // Extract User ID returned from backend or MSAL AD object fallback
+          const userId = response.data.user?.id || response.data.user?._id || adObjectId;
+
+          // Save credentials to Local Storage
           localStorage.setItem('app_jwt', jwtToken);
           localStorage.setItem('user_role', userRole);
           localStorage.setItem('user_name', userName);
+          if (userId) {
+            localStorage.setItem('user_id', String(userId));
+          }
 
           // Route navigation based on assigned role
           if (['ADMINISTRATOR', 'ADMIN', 'Administrator'].includes(userRole)) {

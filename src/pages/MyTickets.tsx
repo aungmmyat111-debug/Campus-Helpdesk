@@ -5,7 +5,7 @@ import { Navbar } from '../components/Navbar';
 import apiClient from '../api/client';
 import type { Ticket } from '../types';
 
-// Inline Ticket Detail Modal Component (Without Comments)
+// Inline Ticket Detail Modal Component
 const InlineTicketModal: React.FC<{
   ticket: Ticket | null;
   onClose: () => void;
@@ -82,6 +82,24 @@ export const MyTickets: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
+  // Retrieve logged-in user credentials from storage
+  const currentUserRole = localStorage.getItem('user_role')?.toUpperCase();
+
+  // Robust extraction for logged in User ID across various potential storage keys
+  const getStoredUserId = () => {
+    const directId = localStorage.getItem('user_id') || localStorage.getItem('userId') || localStorage.getItem('id');
+    if (directId) return directId;
+
+    try {
+      const userObj = JSON.parse(localStorage.getItem('user') || '{}');
+      return userObj.id || userObj.userId || userObj._id || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const currentUserId = getStoredUserId();
+
   useEffect(() => {
     const fetchTickets = async () => {
       try {
@@ -116,10 +134,31 @@ export const MyTickets: React.FC = () => {
       if (selectedTicket?.id === id) {
         setSelectedTicket(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to delete ticket on backend:', err);
-      alert('Could not delete ticket from server. Check if delete endpoint is added on backend.');
+      const serverMsg = err.response?.data?.error || err.response?.data?.message;
+      alert(serverMsg || 'Could not delete ticket from server.');
     }
+  };
+
+  const canDeleteTicket = (ticket: Ticket) => {
+    // 1. Staff can delete any ticket
+    const isStaff = ['ADMIN', 'ADMINISTRATOR', 'TECHNICIAN'].includes(currentUserRole || '');
+    if (isStaff) return true;
+
+    // 2. Extracts creator ID from ticket across standard key variations
+    const ticketOwnerId =
+      ticket.createdById ||
+      (ticket as any).userId ||
+      (ticket as any).createdBy?.id ||
+      (ticket as any).creatorId;
+
+    // 3. Fallback: If viewing "My Tickets" page and ID matching is indeterminate, default to allowed
+    if (!currentUserId || !ticketOwnerId) {
+      return true;
+    }
+
+    return String(ticketOwnerId) === String(currentUserId);
   };
 
   return (
@@ -184,14 +223,18 @@ export const MyTickets: React.FC = () => {
                     >
                       {t.status}
                     </span>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDelete(e, t.id)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                      title="Delete Ticket"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+
+                    {/* Show delete trash icon conditionally based on permission */}
+                    {canDeleteTicket(t) && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDelete(e, t.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                        title="Delete Ticket"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
