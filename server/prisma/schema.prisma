@@ -1,0 +1,60 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  FACULTY
+  TECHNICIAN
+  ADMINISTRATOR
+}
+
+model User {
+  id              String    @id @default(uuid())
+  adObjectId      String    @unique
+  email           String    @unique
+  name            String
+  role            Role      @default(STUDENT)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  createdTickets  Ticket[]  @relation("CreatedBy")
+  assignedTickets Ticket[]  @relation("AssignedTo")
+  comments        Comment[]
+}
+
+model Ticket {
+  id           String    @id @default(uuid())
+  title        String
+  description  String    @db.Text
+  roomNumber   String
+  status       String    @default("OPEN")
+  priority     String    @default("MEDIUM")
+  category     String?
+  eventActive  Boolean   @default(false)
+  
+  createdById  String
+  createdBy    User      @relation("CreatedBy", fields: [createdById], references: [id])
+  
+  assignedToId String?
+  assignedTo   User?     @relation("AssignedTo", fields: [assignedToId], references: [id])
+  
+  comments     Comment[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+}
