@@ -19,7 +19,7 @@ export async function getSecret(secretName: string): Promise<string | undefined>
     console.log(`[Azure Key Vault] Successfully retrieved secret: ${secretName}`);
     return secret.value;
   } catch (error) {
-    console.warn(`[Azure Key Vault] Fallback to .env for: ${secretName}`);
+    console.warn(`[Azure Key Vault] Fallback to .env for: ${secretName}`, error);
     return process.env[secretName];
   }
 }
