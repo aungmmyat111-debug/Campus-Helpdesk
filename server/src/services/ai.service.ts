@@ -1,11 +1,17 @@
 import Groq from 'groq-sdk';
-import dotenv from 'dotenv';
 
-dotenv.config();
+let groqClient: Groq | null = null;
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+function getGroqClient(): Groq {
+  if (!groqClient) {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      throw new Error('GROQ_API_KEY is not set in process.env.');
+    }
+    groqClient = new Groq({ apiKey });
+  }
+  return groqClient;
+}
 
 export interface TicketAnalysis {
   category: 'HARDWARE' | 'SOFTWARE' | 'NETWORK' | 'GENERAL';
@@ -31,6 +37,7 @@ Priority rules:
 Output strictly raw JSON without markdown code blocks.`;
 
   try {
+    const groq = getGroqClient();
     const chatCompletion = await groq.chat.completions.create({
       messages: [
         {
